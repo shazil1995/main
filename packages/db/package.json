@@ -1,0 +1,31 @@
+{
+  "name": "@signage-crm/db",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "generate": "prisma generate",
+    "migrate:dev": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "seed": "ts-node --transpile-only prisma/seed.ts",
+    "studio": "prisma studio",
+    "build": "prisma generate && tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@prisma/client": "5.20.0",
+    "@signage-crm/shared": "0.1.0",
+    "bcryptjs": "2.4.3"
+  },
+  "devDependencies": {
+    "prisma": "5.20.0",
+    "ts-node": "10.9.2",
+    "typescript": "5.5.4",
+    "@types/bcryptjs": "2.4.6",
+    "@types/node": "20.14.9"
+  },
+  "prisma": {
+    "seed": "ts-node --transpile-only prisma/seed.ts"
+  }
+}

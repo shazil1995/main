@@ -1,0 +1,85 @@
+// Canonical permission catalog and default role -> permission mapping.
+// Shared between the seed script and the API's RBAC guard so both stay
+// in sync with the same source of truth.
+
+export const PERMISSIONS = [
+  { key: "leads:read", description: "View leads" },
+  { key: "leads:write", description: "Create and edit leads" },
+  { key: "leads:assign", description: "Assign or reassign leads" },
+  { key: "contacts:read", description: "View contacts" },
+  { key: "contacts:write", description: "Create and edit contacts" },
+  { key: "companies:read", description: "View companies" },
+  { key: "companies:write", description: "Create and edit companies" },
+  { key: "deals:read", description: "View deals" },
+  { key: "deals:write", description: "Create and edit deals" },
+  { key: "tasks:read", description: "View tasks" },
+  { key: "tasks:write", description: "Create and edit tasks" },
+  { key: "calls:read", description: "View calls" },
+  { key: "calls:write", description: "Log and update calls" },
+  { key: "reports:read", description: "View reports" },
+  { key: "settings:manage", description: "Manage tenant settings" },
+  { key: "users:manage", description: "Manage users, teams and roles" },
+  { key: "workflows:manage", description: "Build and publish workflows" },
+  { key: "audit:read", description: "View audit logs" },
+] as const;
+
+export type PermissionKey = (typeof PERMISSIONS)[number]["key"];
+
+export const DEFAULT_ROLES: Record<string, PermissionKey[]> = {
+  administrator: PERMISSIONS.map((p) => p.key),
+  sales_manager: [
+    "leads:read",
+    "leads:write",
+    "leads:assign",
+    "contacts:read",
+    "contacts:write",
+    "companies:read",
+    "companies:write",
+    "deals:read",
+    "deals:write",
+    "tasks:read",
+    "tasks:write",
+    "calls:read",
+    "calls:write",
+    "reports:read",
+    "audit:read",
+  ],
+  calling_agent: [
+    "leads:read",
+    "contacts:read",
+    "contacts:write",
+    "calls:read",
+    "calls:write",
+    "tasks:read",
+    "tasks:write",
+  ],
+  sales_agent: [
+    "leads:read",
+    "leads:write",
+    "contacts:read",
+    "contacts:write",
+    "companies:read",
+    "companies:write",
+    "deals:read",
+    "deals:write",
+    "tasks:read",
+    "tasks:write",
+    "calls:read",
+    "calls:write",
+  ],
+  designer_or_estimator: [
+    "deals:read",
+    "contacts:read",
+    "tasks:read",
+    "tasks:write",
+  ],
+  read_only_analyst: [
+    "leads:read",
+    "contacts:read",
+    "companies:read",
+    "deals:read",
+    "tasks:read",
+    "calls:read",
+    "reports:read",
+  ],
+};

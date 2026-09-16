@@ -1,0 +1,24 @@
+{
+  "name": "signage-crm",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Multi-tenant CRM for a business-signage company",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:generate": "npm run generate --workspace packages/db",
+    "db:migrate": "npm run migrate:dev --workspace packages/db",
+    "db:seed": "npm run seed --workspace packages/db",
+    "dev:api": "npm run dev --workspace apps/api",
+    "dev:web": "npm run dev --workspace apps/web"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
