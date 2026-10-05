@@ -88,7 +88,7 @@ a { color: var(--accent); }
 .grid-scroll { flex: 1; min-height: 0; overflow: auto; position: relative; background: var(--panel); outline: none; }
 .grid-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .grid-head { position: sticky; top: 0; z-index: 5; display: flex; height: var(--header-h); background: var(--panel-2); border-bottom: 1px solid var(--border-strong); }
-.grid-row { display: flex; position: absolute; left: 0; width: 100%; height: var(--row-h); border-bottom: 1px solid var(--border); background: var(--panel); }
+.grid-row { display: flex; position: absolute; top: 0; left: 0; width: 100%; height: var(--row-h); border-bottom: 1px solid var(--border); background: var(--panel); }
 .grid-row:hover { background: var(--panel-2); }
 .grid-row[aria-selected='true'] { background: var(--accent-soft); }
 .gcell { flex: none; padding: 0 8px; display: flex; align-items: center; border-right: 1px solid var(--border); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; position: relative; height: 100%; }
@@ -135,3 +135,68 @@ a { color: var(--accent); }
 .skeleton { background: linear-gradient(90deg, var(--panel-2), var(--border), var(--panel-2)); background-size: 200% 100%; animation: sk 1.2s infinite; border-radius: 4px; height: 14px; }
 @keyframes sk { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } * { transition: none !important; } }
+
+/* export / import / form (forms & io) */
+.export-menu { width: 340px; max-width: 90vw; }
+.export-menu h3 { font-size: 13px; margin: 0 0 4px; }
+.export-menu hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
+.wizard-steps { display: flex; gap: 12px; margin: 0 0 12px; padding: 0; list-style: none; color: var(--muted); font-size: 13px; }
+.wizard-steps [aria-current='step'] { color: var(--text); font-weight: 600; }
+.map-table td, .map-table th { vertical-align: middle; }
+.map-samples { color: var(--muted); font-size: 12px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.progress { width: 100%; height: 14px; }
+.counters { display: flex; gap: 16px; flex-wrap: wrap; margin: 8px 0; }
+.form-shell { max-width: 640px; margin: 0 auto; padding: 20px 16px; overflow: auto; flex: 1; width: 100%; }
+.form-shell .req { color: var(--danger); }
+.design-item { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; margin-bottom: 8px; background: var(--panel); }
+
+/* kanban / gallery / calendar view additions */
+.column.drop { outline: 2px dashed var(--accent); outline-offset: -2px; }
+.column .col-title { font-size: 13px; margin: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.kcard { display: grid; gap: 6px; }
+.kcard[draggable="true"] { cursor: grab; }
+.kcard-open { all: unset; display: grid; gap: 4px; cursor: pointer; border-radius: 4px; }
+.kcard-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.kcard-title, .gcard-title { font-weight: 600; overflow-wrap: anywhere; display: block; }
+.kcard-move { font-size: 12px; min-height: 26px; padding: 2px 6px; }
+.card-fields { display: grid; gap: 2px; }
+.card-field { display: flex; gap: 6px; align-items: baseline; min-width: 0; font-size: 12px; }
+.card-label { color: var(--muted); flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-text, .card-attach { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.gcard { display: block; width: 100%; height: 100%; cursor: pointer; }
+.gcard:hover { border-color: var(--accent); }
+.gcard .cover { width: 100%; padding: 0 8px; }
+.gcard .body { display: grid; gap: 4px; }
+.view-settings { padding: 8px 12px; border-bottom: 1px solid var(--border); position: relative; }
+.field-pick { position: relative; }
+.field-pick summary { list-style: none; cursor: pointer; }
+.field-pick .popover { position: absolute; top: 100%; left: 0; margin-top: 4px; display: grid; gap: 4px; min-width: 200px; max-height: 300px; overflow: auto; }
+.cal-title { margin: 0 0 0 8px; font-size: 16px; }
+.cal-day { min-width: 0; }
+.cal-day:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.cal-num { all: unset; display: inline-block; margin-bottom: 2px; font-size: 12px; }
+button.cal-num { cursor: pointer; border-radius: 999px; }
+button.cal-num:hover .num { text-decoration: underline; }
+button.cal-num:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cal-evt { cursor: pointer; color: var(--text); }
+.cal-more { background: transparent; color: var(--muted); }
+.cal-list { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 6px; max-height: 50vh; overflow: auto; }
+
+/* ───────── admin screens (settings + automations) ───────── */
+.settings-wrap { max-width: 1000px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+.code { background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; overflow-x: auto; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; }
+.kv dt { font-weight: 600; } .kv dd { margin: 0; }
+.fs { border: 1px solid var(--border); border-radius: var(--radius); margin: 0 0 12px; padding: 8px 12px; }
+.fs > legend { font-weight: 600; font-size: 13px; padding: 0 4px; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 12px; }
+.matrix td, .matrix th:not(:first-child) { text-align: center; }
+.fv-row { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(200px, 2fr) auto; gap: 10px; align-items: start; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+.fv-ctl { display: grid; gap: 6px; justify-items: start; }
+.action { background: var(--panel-2); }
+.badge.st-success { color: var(--ok); border-color: var(--ok); }
+.badge.st-failed { color: var(--danger); border-color: var(--danger); }
+.badge.st-skipped { background: var(--warn-soft); }
+@media (max-width: 700px) { .fv-row { grid-template-columns: 1fr; } }

@@ -281,7 +281,8 @@ export function buildQuery(fields: FieldRow[], q: QueryInput, secretForHash: str
 
 export const TOTAL_CAP = 100_000;
 
-export async function runQuery(c: Client, tableId: string, fields: FieldRow[], q: QueryInput, secret: string, defaultLimit = LIMITS.defaultPageSize): Promise<QueryResult> {
+/** Compile a query to SQL + params without running it (used by runQuery and by EXPLAIN tooling). */
+export function compileQuery(tableId: string, fields: FieldRow[], q: QueryInput, secret: string, defaultLimit = LIMITS.defaultPageSize) {
   const limit = q.limit ?? defaultLimit;
   const cur = q.cursor ? decodeCursor(secret, q.cursor) : null;
   const backward = cur?.d === 'b';
@@ -294,7 +295,12 @@ export async function runQuery(c: Client, tableId: string, fields: FieldRow[], q
   const where = cursorSql ? `${filterWhere} AND ${cursorSql}` : filterWhere;
   const sql = `SELECT r.id, r.seq, r.version, ${b.selectValues} AS "values", r.created_at, r.updated_at, r.created_by, r.updated_by${b.selectSort ? ', ' + b.selectSort : ''}
      FROM records r WHERE ${where} ORDER BY ${b.orderBy} LIMIT ${limit + 1}`;
-  const res = await c.query(sql, params.values);
+  return { sql, params: params.values, limit, cur, backward, b, sortHash, filterWhere, countParams };
+}
+
+export async function runQuery(c: Client, tableId: string, fields: FieldRow[], q: QueryInput, secret: string, defaultLimit = LIMITS.defaultPageSize): Promise<QueryResult> {
+  const { sql, params, limit, cur, backward, b, sortHash, filterWhere, countParams } = compileQuery(tableId, fields, q, secret, defaultLimit);
+  const res = await c.query(sql, params);
   const rows = res.rows as (RecordRow & Record<string, unknown>)[];
   const hasMore = rows.length > limit;
   let page = hasMore ? rows.slice(0, limit) : rows;

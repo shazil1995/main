@@ -42,7 +42,7 @@ export async function buildApp(config: Config, db: Db = createDb(config)): Promi
   const ctx: AppContext = { db, config, limiter: new RateLimiter(), registry: [] };
 
   await fastify.register(helmet, {
-    contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'"], styleSrc: ["'self'"], styleSrcAttr: ["'unsafe-inline'"], imgSrc: ["'self'", 'data:'], connectSrc: ["'self'"], frameAncestors: ["'none'"], objectSrc: ["'none'"], baseUri: ["'self'"], formAction: ["'self'"] } },
+    contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'"], styleSrc: ["'self'"], styleSrcAttr: ["'unsafe-inline'"], imgSrc: ["'self'", 'data:'], connectSrc: ["'self'"], frameAncestors: ["'none'"], objectSrc: ["'none'"], upgradeInsecureRequests: null, baseUri: ["'self'"], formAction: ["'self'"] } },
     crossOriginResourcePolicy: { policy: 'same-origin' },
   });
   await fastify.register(cookie);
@@ -73,7 +73,9 @@ export async function buildApp(config: Config, db: Db = createDb(config)): Promi
   fastify.setNotFoundHandler((req, reply) => {
     if (req.url.startsWith('/api/')) return reply.status(404).send({ error: { code: 'not_found', message: 'No such endpoint', trace_id: req.id } });
     const index = webIndex();
-    if (index && req.method === 'GET') return reply.type('text/html').sendFile('index.html');
+    const last = req.url.split('?')[0]!.split('/').pop() ?? '';
+    // SPA fallback only for route-like paths; a missing asset must be a real 404 (never HTML served as JS/CSS)
+    if (index && req.method === 'GET' && !last.includes('.')) return reply.type('text/html').sendFile('index.html');
     return reply.status(404).send({ error: { code: 'not_found', message: 'Not found', trace_id: req.id } });
   });
 
@@ -103,7 +105,7 @@ export async function buildApp(config: Config, db: Db = createDb(config)): Promi
   fastify.get('/api/v1/openapi.json', async () => (spec ??= buildOpenApi(ctx.registry, API_VERSION)));
 
   const dist = webIndex();
-  if (dist) await fastify.register(fastifyStatic, { root: dirname(dist), wildcard: false, index: false, maxAge: '1h', setHeaders: (res: any, p: string) => { if (p.endsWith('index.html')) res.setHeader('cache-control', 'no-cache'); } });
+  if (dist) await fastify.register(fastifyStatic, { root: dirname(dist), index: 'index.html', maxAge: '1h', setHeaders: (res: any, p: string) => { if (p.endsWith('index.html')) res.header('cache-control', 'no-cache'); } });
 
   return { fastify, ctx };
 }
