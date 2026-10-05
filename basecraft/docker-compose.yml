@@ -1,0 +1,39 @@
+# Development / single-host reference deployment. Passwords come from the environment (see .env.example); nothing is hard-coded.
+# NOTE: this file has been validated for syntax only in the build sandbox (no Docker daemon was available) — treat the first `docker compose up` as untested.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?set POSTGRES_ADMIN_PASSWORD}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres"], interval: 5s, timeout: 3s, retries: 20 }
+    ports: ["127.0.0.1:5432:5432"]
+  init:        # one-shot: roles, database, extension, migrations (kept OUT of request handling)
+    build: .
+    depends_on: { db: { condition: service_healthy } }
+    environment:
+      ADMIN_DATABASE_URL: postgres://postgres:${POSTGRES_ADMIN_PASSWORD}@db:5432/postgres
+      BASECRAFT_OWNER_PASSWORD: ${BASECRAFT_OWNER_PASSWORD:?}
+      BASECRAFT_APP_PASSWORD: ${BASECRAFT_APP_PASSWORD:?}
+      DATABASE_URL: postgres://basecraft_owner:${BASECRAFT_OWNER_PASSWORD}@db:5432/basecraft
+      SERVER_SECRET: ${SERVER_SECRET:?}
+      APP_DATABASE_URL: postgres://basecraft_app:${BASECRAFT_APP_PASSWORD}@db:5432/basecraft
+    user: root
+    entrypoint: ["/bin/sh", "-c", "apt-get update -qq && apt-get install -y -qq postgresql-client >/dev/null && bash /app/server/scripts/db-init.sh && node -e \"import('/app/server/dist/migrate.js').then(m=>m.migrate(process.env.DATABASE_URL))\""]
+    restart: "no"
+  api:
+    build: .
+    depends_on: { init: { condition: service_completed_successfully } }
+    environment:
+      APP_DATABASE_URL: postgres://basecraft_app:${BASECRAFT_APP_PASSWORD}@db:5432/basecraft
+      DATABASE_URL: postgres://basecraft_owner:${BASECRAFT_OWNER_PASSWORD}@db:5432/basecraft
+      SERVER_SECRET: ${SERVER_SECRET}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:4100}
+      HOST: 0.0.0.0
+      ALLOW_SIGNUP: ${ALLOW_SIGNUP:-true}
+      ATTACHMENT_DIR: /data/attachments
+      IMPORT_DIR: /data/imports
+      WORKER_MODE: inline
+    volumes: [blobs:/data]
+    ports: ["127.0.0.1:4100:4100"]
+volumes: { pgdata: {}, blobs: {} }
