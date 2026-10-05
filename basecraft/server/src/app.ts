@@ -81,6 +81,10 @@ export async function buildApp(config: Config, db: Db = createDb(config)): Promi
 
   // health: liveness never touches the database; readiness checks it and the migration state
   fastify.get('/healthz', async () => ({ status: 'ok' }));
+  // Warn once at startup when the optional superuser-provisioned fast paths are missing (queries still correct, just slower at scale).
+  void db.app.query(`SELECT proleakproof FROM pg_proc WHERE proname = 'bc_jtext' LIMIT 1`).then((r) => {
+    if (!r.rows[0]?.proleakproof) fastify.log.warn('LEAKPROOF fast paths are not provisioned (see server/sql/leakproof.sql): filters and search will scan behind row-level security');
+  }).catch(() => {});
   fastify.get('/readyz', async (_req, reply) => {
     try {
       const r = await db.app.query(`SELECT 1 FROM bases LIMIT 0`);

@@ -1,0 +1,227 @@
+{
+  "meta": {
+    "when": "2026-10-05T12:40:45.145Z",
+    "records": 100000,
+    "fields": 20,
+    "clients": 20,
+    "secondsPerScenario": 10,
+    "loadSeconds": 20.4,
+    "tableSize": "130 MB",
+    "indexesSizeBeforeFieldIndexes": "42 MB",
+    "host": {
+      "cpus": 4,
+      "cpuModel": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+      "totalMemGb": 15.7,
+      "os": "Linux 6.18.44-fc-v70",
+      "node": "v22.22.0",
+      "postgres": "16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)"
+    },
+    "note": "Load generator, API and PostgreSQL share ONE machine (no network latency). Numbers are API-level, warm cache. See PERFORMANCE.md for limitations."
+  },
+  "memory": {
+    "api_idle_rss_mb": 205.9,
+    "api_peak_rss_mb": 215.9,
+    "api_hwm_mb": 218.4,
+    "postgres_total_rss_mb": 2103
+  },
+  "results": [
+    {
+      "name": "list-100-default-order",
+      "note": "first page, 100 rows x 8 projected fields, seq order",
+      "requests": 3092,
+      "errors": 0,
+      "rps": 309.2,
+      "p50": 59.81,
+      "p95": 84.57,
+      "p99": 193.5,
+      "max": 563.98
+    },
+    {
+      "name": "list-100-deep-cursor",
+      "note": "page after ~50k rows via cursor (keyset)",
+      "requests": 3754,
+      "errors": 0,
+      "rps": 375.4,
+      "p50": 53.05,
+      "p95": 71.35,
+      "p99": 82.75,
+      "max": 104.73
+    },
+    {
+      "name": "filter-status-eq",
+      "note": "single select eq (20% of rows), no field index",
+      "requests": 4129,
+      "errors": 0,
+      "rps": 412.9,
+      "p50": 48.25,
+      "p95": 64.61,
+      "p99": 71.41,
+      "max": 84.19
+    },
+    {
+      "name": "filter-and-or",
+      "note": "AND/OR group on select + integer + checkbox",
+      "requests": 3589,
+      "errors": 0,
+      "rps": 358.9,
+      "p50": 54.82,
+      "p95": 78.5,
+      "p99": 91.29,
+      "max": 119.17
+    },
+    {
+      "name": "filter-rare-score",
+      "note": "Score eq 777 (~0.1% of rows)",
+      "requests": 340,
+      "errors": 0,
+      "rps": 34,
+      "p50": 600.17,
+      "p95": 741.41,
+      "p99": 858.57,
+      "max": 998.14
+    },
+    {
+      "name": "sort-qty-desc",
+      "note": "sort integer desc, 100 rows",
+      "requests": 76,
+      "errors": 0,
+      "rps": 7.6,
+      "p50": 2755.52,
+      "p95": 4890.17,
+      "p99": 5063.73,
+      "max": 5063.73
+    },
+    {
+      "name": "sort-name-asc",
+      "note": "sort text asc (unindexed)",
+      "requests": 85,
+      "errors": 0,
+      "rps": 8.5,
+      "p50": 2493.04,
+      "p95": 4337.49,
+      "p99": 4647.91,
+      "max": 4647.91
+    },
+    {
+      "name": "search-trigram",
+      "note": "search 'granite vertex' (pg_trgm)",
+      "requests": 347,
+      "errors": 0,
+      "rps": 34.7,
+      "p50": 581.58,
+      "p95": 783.48,
+      "p99": 863.02,
+      "max": 951.65
+    },
+    {
+      "name": "count-total",
+      "note": "filter + include_total (capped count)",
+      "requests": 323,
+      "errors": 0,
+      "rps": 32.3,
+      "p50": 643.1,
+      "p95": 845.53,
+      "p99": 922.43,
+      "max": 992.67
+    },
+    {
+      "name": "get-record",
+      "note": "GET one record",
+      "requests": 7089,
+      "errors": 0,
+      "rps": 708.9,
+      "p50": 25.85,
+      "p95": 45.11,
+      "p99": 87.12,
+      "max": 161.93
+    },
+    {
+      "name": "write-create",
+      "note": "POST one record",
+      "requests": 5739,
+      "errors": 0,
+      "rps": 573.9,
+      "p50": 32.95,
+      "p95": 51.05,
+      "p99": 76.76,
+      "max": 233.79
+    },
+    {
+      "name": "write-update",
+      "note": "PATCH one record (If-Match version 1)",
+      "requests": 20,
+      "errors": 0,
+      "rps": 5,
+      "p50": 24.05,
+      "p95": 30.64,
+      "p99": 30.64,
+      "max": 30.64
+    }
+  ],
+  "indexExperiments": [
+    {
+      "field": "Score",
+      "scenario": "filter-rare-score",
+      "buildSeconds": 0.2,
+      "indexesSizeAfter": "48 MB",
+      "before": {
+        "p50": 600.17,
+        "p95": 741.41,
+        "rps": 34
+      },
+      "after": {
+        "p50": 601.61,
+        "p95": 827.1,
+        "rps": 33.3
+      }
+    },
+    {
+      "field": "Qty",
+      "scenario": "sort-qty-desc",
+      "buildSeconds": 0.3,
+      "indexesSizeAfter": "51 MB",
+      "before": {
+        "p50": 2755.52,
+        "p95": 4890.17,
+        "rps": 7.6
+      },
+      "after": {
+        "p50": 54.55,
+        "p95": 76.91,
+        "rps": 363.3
+      }
+    },
+    {
+      "field": "Name",
+      "scenario": "sort-name-asc",
+      "buildSeconds": 0.2,
+      "indexesSizeAfter": "56 MB",
+      "before": {
+        "p50": 2493.04,
+        "p95": 4337.49,
+        "rps": 8.5
+      },
+      "after": {
+        "p50": 49.2,
+        "p95": 70.27,
+        "rps": 398.8
+      }
+    },
+    {
+      "field": "Status",
+      "scenario": "filter-status-eq",
+      "buildSeconds": 0.2,
+      "indexesSizeAfter": "61 MB",
+      "before": {
+        "p50": 48.25,
+        "p95": 64.61,
+        "rps": 412.9
+      },
+      "after": {
+        "p50": 49.12,
+        "p95": 72.93,
+        "rps": 396.9
+      }
+    }
+  ]
+}

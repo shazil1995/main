@@ -133,7 +133,7 @@ export async function runImportJob(app: AppContext, job: JobRow, heartbeat: () =
         if (opts.duplicate_policy !== 'create') {
           const keys = [...new Set(batch.map((b) => b.values[opts.match_field!]).filter((v) => v !== undefined).map(String))];
           if (keys.length) {
-            const r = await c.query(`SELECT DISTINCT ON (k) id, version, k FROM (SELECT id, version, seq, "values"->>$2 AS k FROM records WHERE table_id=$1 AND "values"->>$2 = ANY($3::text[])) x ORDER BY k, seq`, [job.table_id, opts.match_field, keys]);
+            const r = await c.query(`SELECT DISTINCT ON (k) id, version, k FROM (SELECT id, version, seq, bc_jtext("values", $2) AS k FROM records WHERE table_id=$1 AND bc_jtext("values", $2) = ANY($3::text[])) x ORDER BY k, seq`, [job.table_id, opts.match_field, keys]);
             existing = new Map(r.rows.map((x) => [x.k as string, { id: x.id as string, version: x.version as number }]));
           }
         }

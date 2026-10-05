@@ -38,6 +38,14 @@ Base/table **grants** can raise a member's role on one table or set `none` to hi
 **not available** (Phase 2) — do not rely on this build to hide individual columns or rows from a user who can open the table.
 Admins cannot assign roles ≥ their own and cannot touch owners; a workspace always keeps ≥ 1 owner.
 
+## Superuser-provisioned helpers (read before running `server/sql/leakproof.sql`)
+
+`bc_jtext` and `bc_textlike` are aliases of stock Postgres functions that a superuser marks `LEAKPROOF` so index conditions work behind
+row-level security. Marking a function leakproof is a **security assertion** to the planner: it promises the function cannot reveal
+argument values through errors or side channels. `jsonb_object_field_text` never raises on jsonb input. `textlike` can raise only on a
+malformed pattern (a trailing escape), which depends on the pattern — always generated and escaped by Basecraft — not on stored data.
+If you are not comfortable with that argument, skip the script: everything works without it, only slower at scale.
+
 ## Deployment checklist (before exposing to a network)
 
 1. `ALLOW_SIGNUP=false` and onboard via invitations; set `PUBLIC_ORIGIN` to the real https origin and terminate TLS in front.

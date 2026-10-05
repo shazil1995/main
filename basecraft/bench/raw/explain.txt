@@ -1,0 +1,90 @@
+### list default
+Limit (actual time=0.080..0.571 rows=101 loops=1)
+  Buffers: shared hit=20
+  ->  Index Scan using records_table_seq_idx on records r (actual time=0.079..0.562 rows=101 loops=1)
+        Index Cond: (table_id = '8c820a66-c2c7-4502-995b-e4efe3359130'::uuid)
+        Filter: (workspace_id = (NULLIF(current_setting('app.workspace_id'::text, true), ''::text))::uuid)
+        Buffers: shared hit=20
+Planning:
+  Buffers: shared hit=306 read=12
+Planning Time: 0.985 ms
+Execution Time: 0.606 ms
+
+### filter status eq (indexed)
+Limit (actual time=0.023..0.570 rows=101 loops=1)
+  Buffers: shared hit=90
+  ->  Index Scan using records_table_seq_idx on records r (actual time=0.022..0.561 rows=101 loops=1)
+        Index Cond: (table_id = '8c820a66-c2c7-4502-995b-e4efe3359130'::uuid)
+        Filter: ((workspace_id = (NULLIF(current_setting('app.workspace_id'::text, true), ''::text))::uuid) AND (("values" ->> '83b3ffb9-02a4-4a73-b544-1841fa6f4625'::text) = 'opt_c1b7bc559a'::text))
+        Rows Removed by Filter: 401
+        Buffers: shared hit=90
+Planning Time: 0.126 ms
+Execution Time: 0.589 ms
+
+### filter score eq (indexed)
+Limit (actual time=0.928..141.937 rows=101 loops=1)
+  Buffers: shared hit=13556 read=9772 written=10
+  ->  Index Scan using records_table_seq_idx on records r (actual time=0.926..141.870 rows=101 loops=1)
+        Index Cond: (table_id = '8c820a66-c2c7-4502-995b-e4efe3359130'::uuid)
+        Filter: ((workspace_id = (NULLIF(current_setting('app.workspace_id'::text, true), ''::text))::uuid) AND ((("values" ->> '2193478a-b583-4045-8c54-6000c5aae593'::text))::numeric = 777.00000000))
+        Rows Removed by Filter: 101077
+        Buffers: shared hit=13556 read=9772 written=10
+Planning:
+  Buffers: shared hit=3
+Planning Time: 0.137 ms
+Execution Time: 142.215 ms
+
+### sort qty desc (indexed)
+Limit (actual time=0.025..0.247 rows=101 loops=1)
+  Buffers: shared hit=102
+  ->  Index Scan Backward using rx_8c820a66c2c7_f10d0bc072a0 on records r (actual time=0.024..0.239 rows=101 loops=1)
+        Filter: (workspace_id = (NULLIF(current_setting('app.workspace_id'::text, true), ''::text))::uuid)
+        Buffers: shared hit=102
+Planning:
+  Buffers: shared hit=8
+Planning Time: 0.159 ms
+Execution Time: 0.263 ms
+
+### sort name asc (indexed)
+Limit (actual time=0.034..0.307 rows=101 loops=1)
+  Buffers: shared hit=104
+  ->  Index Scan using rx_8c820a66c2c7_fc070545fd5b on records r (actual time=0.033..0.298 rows=101 loops=1)
+        Filter: (workspace_id = (NULLIF(current_setting('app.workspace_id'::text, true), ''::text))::uuid)
+        Buffers: shared hit=104
+Planning:
+  Buffers: shared hit=5
+Planning Time: 0.149 ms
+Execution Time: 0.324 ms
+
+### search trigram
+Limit (actual time=43.386..47.980 rows=0 loops=1)
+  Buffers: shared hit=15602 read=2168
+  ->  Gather Merge (actual time=43.384..47.976 rows=0 loops=1)
+        Workers Planned: 2
+        Workers Launched: 2
+        Buffers: shared hit=15602 read=2168
+        ->  Sort (actual time=40.129..40.131 rows=0 loops=3)
+              Sort Key: seq
+              Sort Method: quicksort  Memory: 25kB
+              Buffers: shared hit=15602 read=2168
+              Worker 0:  Sort Method: quicksort  Memory: 25kB
+              Worker 1:  Sort Method: quicksort  Memory: 25kB
+              ->  Parallel Seq Scan on records r (actual time=40.079..40.080 rows=0 loops=3)
+                    Filter: ((table_id = '8c820a66-c2c7-4502-995b-e4efe3359130'::uuid) AND (workspace_id = (NULLIF(current_setting('app.workspace_id'::text, true), ''::text))::uuid) AND (search_text ~~ '%granite vertex%'::text))
+                    Rows Removed by Filter: 35383
+                    Buffers: shared hit=15528 read=2168
+Planning:
+  Buffers: shared hit=5
+Planning Time: 0.169 ms
+Execution Time: 48.016 ms
+
+### multi-select has_any
+Limit (actual time=0.086..0.392 rows=101 loops=1)
+  Buffers: shared hit=55
+  ->  Index Scan using records_table_seq_idx on records r (actual time=0.021..0.320 rows=101 loops=1)
+        Index Cond: (table_id = '8c820a66-c2c7-4502-995b-e4efe3359130'::uuid)
+        Filter: ((workspace_id = (NULLIF(current_setting('app.workspace_id'::text, true), ''::text))::uuid) AND (("values" -> '373f88d3-289d-4634-b577-a1950e9160db'::text) ?| '{opt_34c29ec8e1}'::text[]))
+        Rows Removed by Filter: 203
+        Buffers: shared hit=55
+Planning Time: 0.159 ms
+Execution Time: 0.410 ms

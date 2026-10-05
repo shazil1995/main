@@ -85,7 +85,7 @@ const scenarios: Scenario[] = [
   { name: 'filter-rare-score', note: 'Score eq 777 (~0.1% of rows)', req: () => q({ limit: 100, fields: proj, filter: { field: F.Score, op: 'eq', value: 777 } }) },
   { name: 'sort-qty-desc', note: 'sort integer desc, 100 rows', req: () => q({ limit: 100, fields: proj, sort: [{ field: F.Qty, direction: 'desc' }] }) },
   { name: 'sort-name-asc', note: 'sort text asc (unindexed)', req: () => q({ limit: 100, fields: proj, sort: [{ field: F.Name, direction: 'asc' }] }) },
-  { name: 'search-trigram', note: "search 'granite vertex' (pg_trgm)", req: () => q({ limit: 100, fields: proj, search: 'granite vertex' }) },
+  { name: 'search-trigram', note: "search 'sign 7777' (substring; matches ~11 rows)", req: () => q({ limit: 100, fields: proj, search: 'sign 7777' }) },
   { name: 'count-total', note: 'filter + include_total (capped count)', req: () => q({ limit: 1, fields: [F.Name], include_total: true, filter: { field: F.Region, op: 'eq', value: 'West' } }) },
   { name: 'get-record', note: 'GET one record', req: (i) => ({ method: 'GET', url: `/api/v1/records/${pool[i % pool.length]}` }) },
   { name: 'write-create', note: 'POST one record', req: (i) => ({ method: 'POST', url: `/api/v1/tables/${tbl.id}/records`, body: rec(900_000 + i) }) },
@@ -116,14 +116,14 @@ const idleRss = rssKb(srv.pid!);
 const results: any[] = [];
 for (const s of scenarios) { await drive(s, 4, 1); const r = await drive(s, CLIENTS, SECONDS); results.push(r); console.log(`${r.name.padEnd(26)} rps=${String(r.rps).padStart(7)} p50=${r.p50}ms p95=${r.p95}ms p99=${r.p99}ms err=${r.errors}`); }
 
-// record-update scenario: each record is patched exactly once at version 1 (no conflicts), 20 clients
+// record-update scenario: each record is patched exactly once at version 1 (no conflicts), CLIENTS concurrent clients
 {
   const all: string[] = []; let cur: string | undefined;
   while (all.length < 6000) { const r = await call('POST', `/api/v1/tables/${tbl.id}/records/query`, { limit: 500, fields: [F.Name], cursor: cur }, TOKEN); all.push(...r.records.map((x: any) => x.id)); cur = r.next_cursor; if (!cur) break; }
-  const upd: Scenario = { name: 'write-update', note: 'PATCH one record (If-Match version 1)', req: (i) => ({ method: 'PATCH', url: `/api/v1/records/${all[i % all.length]}`, body: { fields: { [F.Qty]: i % 50 } } }) };
-  const lat: number[] = []; let errors = 0, n = 0; const end = performance.now() + Math.min(SECONDS, (all.length / 1500));
-  await Promise.all(Array.from({ length: CLIENTS }, async () => { while (performance.now() < end && n < all.length) { const i = n++; const r = upd.req(i, 0); const t = performance.now(); const res = await fetch(base + r.url, { method: 'PATCH', headers: { authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json', 'if-match': '"1"' }, body: JSON.stringify(r.body) }); await res.arrayBuffer(); if (!res.ok) errors++; lat.push(performance.now() - t); } }));
-  const r = { name: upd.name, note: upd.note, requests: lat.length, errors, rps: +(lat.length / Math.max(1, Math.min(SECONDS, all.length / 1500))).toFixed(1), p50: +pct(lat, 50).toFixed(2), p95: +pct(lat, 95).toFixed(2), p99: +pct(lat, 99).toFixed(2), max: +Math.max(...lat).toFixed(2), raw: lat.map((x) => +x.toFixed(2)) };
+  const lat: number[] = []; let errors = 0, n = 0; const t0u = performance.now();
+  await Promise.all(Array.from({ length: CLIENTS }, async () => { while (n < all.length) { const i = n++; const t = performance.now(); const res = await fetch(`${base}/api/v1/records/${all[i]}`, { method: 'PATCH', headers: { authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json', 'if-match': '"1"' }, body: JSON.stringify({ fields: { [F.Qty]: i % 50 } }) }); await res.arrayBuffer(); if (!res.ok) errors++; lat.push(performance.now() - t); } }));
+  const secs = (performance.now() - t0u) / 1000;
+  const r = { name: 'write-update', note: `PATCH one record (If-Match version 1), ${all.length} distinct records`, requests: lat.length, errors, rps: +(lat.length / secs).toFixed(1), p50: +pct(lat, 50).toFixed(2), p95: +pct(lat, 95).toFixed(2), p99: +pct(lat, 99).toFixed(2), max: +Math.max(...lat).toFixed(2), raw: lat.map((x) => +x.toFixed(2)) };
   results.push(r); console.log(`${r.name.padEnd(26)} rps=${String(r.rps).padStart(7)} p50=${r.p50}ms p95=${r.p95}ms p99=${r.p99}ms err=${r.errors}`);
 }
 
@@ -150,7 +150,7 @@ const plans: string[] = [];
 for (const [label, query] of [
   ['list default', { limit: 100, fields: proj }], ['filter status eq (indexed)', { limit: 100, filter: { field: F.Status, op: 'eq', value: 'Approved' } }],
   ['filter score eq (indexed)', { limit: 100, filter: { field: F.Score, op: 'eq', value: 777 } }], ['sort qty desc (indexed)', { limit: 100, sort: [{ field: F.Qty, direction: 'desc' }] }],
-  ['sort name asc (indexed)', { limit: 100, sort: [{ field: F.Name, direction: 'asc' }] }], ['search trigram', { limit: 100, search: 'granite vertex' }], ['multi-select has_any', { limit: 100, filter: { field: F.Tags, op: 'has_any', value: ['Rush'] } }],
+  ['sort name asc (indexed)', { limit: 100, sort: [{ field: F.Name, direction: 'asc' }] }], ['search trigram', { limit: 100, search: 'sign 7777' }], ['multi-select has_any', { limit: 100, filter: { field: F.Tags, op: 'has_any', value: ['Rush'] } }],
 ] as [string, any][]) {
   const c = compileQuery(tbl.id, fields, query, 'x'.repeat(48));
   await app.query('BEGIN'); await app.query(`SELECT set_config('app.workspace_id', $1, true)`, [ws]);
@@ -158,9 +158,10 @@ for (const [label, query] of [
   await app.query('ROLLBACK');
   plans.push(`### ${label}\n${ex.rows.map((r: any) => r['QUERY PLAN']).join('\n')}\n`);
 }
+const fastPaths = (await owner.query(`SELECT proleakproof FROM pg_proc WHERE proname='bc_jtext'`)).rows[0]?.proleakproof === true;
 const mem = { api_idle_rss_mb: +(idleRss / 1024).toFixed(1), api_peak_rss_mb: +(peak.api / 1024).toFixed(1), api_hwm_mb: +(hwmKb(srv.pid!) / 1024).toFixed(1), postgres_total_rss_mb: pgRssMb() };
 const meta = {
-  when: new Date().toISOString(), records: RECORDS, fields: 20, clients: CLIENTS, secondsPerScenario: SECONDS, loadSeconds: +loadSec.toFixed(1), tableSize: sizes.tbl, indexesSizeBeforeFieldIndexes: sizes.idx,
+  when: new Date().toISOString(), leakproofFastPathsProvisioned: fastPaths, records: RECORDS, fields: 20, clients: CLIENTS, secondsPerScenario: SECONDS, loadSeconds: +loadSec.toFixed(1), tableSize: sizes.tbl, indexesSizeBeforeFieldIndexes: sizes.idx,
   host: { cpus: os.cpus().length, cpuModel: os.cpus()[0]?.model, totalMemGb: +(os.totalmem() / 2 ** 30).toFixed(1), os: `${os.type()} ${os.release()}`, node: process.version, postgres: (await owner.query('SHOW server_version')).rows[0].server_version },
   note: 'Load generator, API and PostgreSQL share ONE machine (no network latency). Numbers are API-level, warm cache. See PERFORMANCE.md for limitations.',
 };

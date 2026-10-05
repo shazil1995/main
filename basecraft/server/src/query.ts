@@ -51,7 +51,8 @@ interface Col { sql: string; kind: SqlKind; field: FieldRow }
 function colOf(f: FieldRow): Col {
   if (!UUID_RE.test(f.id)) throw new Error('unsafe field id');
   const kind = FIELD_SQL_KIND[f.type];
-  const t = `(r."values"->>'${f.id}')`;
+  // bc_jtext is a (when provisioned) LEAKPROOF alias of jsonb ->> so equality/range on it can use expression indexes behind RLS
+  const t = `bc_jtext(r."values", '${f.id}')`;
   switch (f.type) {
     case 'created_time': return { sql: 'r.created_at', kind, field: f };
     case 'modified_time': return { sql: 'r.updated_at', kind, field: f };
@@ -62,6 +63,9 @@ function colOf(f: FieldRow): Col {
     default: return { sql: t, kind, field: f }; // text-like, date, datetime (fixed-width text sorts chronologically), single_select
   }
 }
+/** The raw stored text of a field (what leakproof, index-friendly equality compares against). */
+const rawText = (f: FieldRow) => `bc_jtext(r."values", '${f.id}')`;
+const numericScale = (f: FieldRow) => (f.type === 'integer' ? 0 : Number(f.options.scale ?? 2));
 
 const escLike = (s: string) => s.replace(/[\\%_]/g, (m) => '\\' + m);
 
@@ -105,8 +109,8 @@ function condition(col: Col, op: FilterOperator, value: unknown, p: Params): str
     case 'is_not_empty':
       if (f.type === 'attachment') return `EXISTS (SELECT 1 FROM attachments a WHERE a.record_id = r.id AND a.field_id = '${f.id}' AND a.deleted_at IS NULL)`;
       return isText ? `(${e} IS NOT NULL AND ${e} <> '')` : `${e} IS NOT NULL`;
-    case 'is_true': return `${e} IS TRUE`;
-    case 'is_false': return `${e} IS FALSE`;
+    case 'is_true': return `${rawText(f)} = 'true'`;
+    case 'is_false': return `${rawText(f)} = 'false'`;
     case 'has_any': case 'has_all': case 'has_none': {
       const ids = p.add(optionIds(f, value));
       if (f.type === 'single_select') {
@@ -126,6 +130,13 @@ function condition(col: Col, op: FilterOperator, value: unknown, p: Params): str
       return `${e} ILIKE ${ph} ESCAPE '\\'`;
     }
     case 'eq': case 'neq': case 'gt': case 'gte': case 'lt': case 'lte': {
+      if (col.kind === 'numeric' && (op === 'eq' || op === 'neq')) {
+        // exact text equality on the canonical stored form: leakproof, so a text expression index can serve it behind RLS
+        let canon: string | null = null;
+        try { canon = canonicalDecimal(value, numericScale(f)); } catch { canon = null; } // more precision than the field stores => can never match
+        if (canon === null) return op === 'eq' ? 'FALSE' : 'TRUE';
+        return `${rawText(f)} ${op === 'eq' ? '=' : 'IS DISTINCT FROM'} ${p.add(canon)}::text`;
+      }
       let ph: string;
       if (f.type === 'single_select') ph = p.add(optionIds(f, value)[0]);
       else if (col.kind === 'numeric') ph = `${p.add(coerceScalar(f, value))}::numeric`;
@@ -208,13 +219,13 @@ export function buildQuery(fields: FieldRow[], q: QueryInput, secretForHash: str
   if (q.search?.trim()) {
     const term = q.search.trim().toLowerCase();
     const ph = p.add(`%${escLike(term)}%`);
-    const alts = [`r.search_text LIKE ${ph} ESCAPE '\\'`];
+    const alts = [`r.search_text ~~~ ${ph}`];
     for (const f of fields) {
       if (f.type !== 'single_select' && f.type !== 'multi_select') continue;
       const ids = ((f.options.options ?? []) as SelectOption[]).filter((o) => o.name.toLowerCase().includes(term)).map((o) => o.id);
       if (!ids.length) continue;
       const idp = p.add(ids);
-      alts.push(f.type === 'single_select' ? `(r."values"->>'${f.id}') = ANY(${idp}::text[])` : `(r."values"->'${f.id}') ?| ${idp}::text[]`);
+      alts.push(f.type === 'single_select' ? `${rawText(f)} = ANY(${idp}::text[])` : `(r."values"->'${f.id}') ?| ${idp}::text[]`);
     }
     clauses.push(`(${alts.join(' OR ')})`);
   }

@@ -40,11 +40,30 @@ Why JSONB (and what it costs):
 | Typed cell table (EAV) | Strong typing and per-type indexes, but N rows per record and heavy joins to materialise a page. Rejected for read-heavy grids. |
 | Physical column per field (DDL on user action) | Fastest scans, but DDL locks, 1600-column limit, and migrations on every schema edit. Rejected for Phase 1. |
 
-Typed projection strategy: a field may be flagged `indexed`; the server then runs
-`CREATE INDEX CONCURRENTLY … ON records ((("values"->>'<field-uuid>')::numeric), seq) WHERE table_id = '<uuid>'`
-(partial, per table, expression matches the query exactly). Both sort directions use one index because ASC is `NULLS LAST` and
-DESC is `NULLS FIRST` (Postgres defaults) and the `seq` tie-break follows the first sort direction. Measured effect and the
-write/size cost are in `PERFORMANCE.md`; indexes are opt-in because every one adds write amplification.
+Typed projection strategy: a field may be flagged `indexed`; the server then runs (CONCURRENTLY, as the owner role, after commit)
+`CREATE INDEX … ON records ((bc_jtext("values",'<field-uuid>')), seq) WHERE table_id = '<uuid>'` — a partial, per-table expression index —
+and, for numeric types, a second `((bc_jtext(…))::numeric, seq)` index for numeric ORDER BY. Both sort directions use one index because
+ASC is `NULLS LAST` and DESC is `NULLS FIRST` (Postgres defaults) and the `seq` tie-break follows the first sort direction. Indexes are
+opt-in because each one adds write amplification and disk (measured in `PERFORMANCE.md`).
+
+### The row-level-security / index interaction (important, measured)
+
+Behind an RLS policy Postgres only pushes an operator into an *index condition* if the operator is **LEAKPROOF**. jsonb `->>`, numeric
+casts/comparisons and `LIKE` are not, so with plain SQL every JSONB filter and every search silently became a table scan (measured on
+100k rows: a rare-value filter 137 ms vs 0.6 ms; ORDER BY was unaffected because ordering is not a qual). Basecraft therefore queries
+through two aliases of stock Postgres functions — `bc_jtext` (= `jsonb_object_field_text`) and the `~~~` operator (= `textlike`, with its
+own GIN operator class `bc_trgm_ops`) — which a **superuser** marks LEAKPROOF once per database (`server/sql/leakproof.sql`, run by
+`db-init.sh`). Without that step migration 0004 installs equivalent plain functions: results are identical, queries are just slower at
+scale (the full test suite passes both ways; the server logs a warning at startup). What this does and does not buy:
+
+| predicate | index-assisted behind RLS when provisioned |
+|---|---|
+| equality / IN on text, email, URL, phone, selects, dates, datetimes, checkbox, and equality on numbers (canonical text form) | yes |
+| range (`>`, `<`) on text/date/datetime (fixed-width text) | yes |
+| range on integer/decimal/currency/percent (numeric operators are not leakproof) | **no** (scan) |
+| `contains` / `starts_with` / `not_contains` (ILIKE) | **no** (scan); the `search` box uses the trigram path instead |
+| multi-select `has_*` (jsonb `?|`) | **no** (scan) |
+| ORDER BY on an indexed field (either direction) | yes |
 
 Value representation (all validated in `server/src/fieldTypes.ts`):
 `integer` → JSON number (safe-int range); `decimal/currency/percent` → canonical **string** with fixed scale (never a float;
