@@ -1,19 +1,20 @@
-== restore test 2026-10-05T12:37:11Z ==
-backup: 92K in 0.2s
-restore: 0.4s
+== restore test 2026-10-05T12:56:14Z ==
+backup: 16M in 2.0s
+restore: 7.1s
+fast paths restored (leakproof): t
 -- row counts (source vs restored) --
 users                 1        1 OK
 workspaces            1        1 OK
 members               1        1 OK
 bases                 1        1 OK
-tables                3        3 OK
-fields               22       22 OK
-records              74       74 OK
-views                 8        8 OK
+tables                1        1 OK
+fields               20       20 OK
+records          106048   106048 OK
+views                 1        1 OK
 attachments           0        0 OK
-automations           1        1 OK
-audit_events        103      103 OK
-outbox_events        14       14 OK
+automations           0        0 OK
+audit_events     106531   106531 OK
+outbox_events         0        0 OK
 -- integrity --
 rls tables enabled: 14
 policies: 14
@@ -21,8 +22,8 @@ foreign keys: 31
 audit immutability trigger present: 1
 -- RLS still enforced for the application role on the restored database --
 no context:    0 rows visible (expected 0)
-with workspace: 74 rows visible (expected = that workspace's records)
-expected:       74
+with workspace: 106048 rows visible (expected = that workspace's records)
+expected:       106048
 -- a record round-trips through the restored schema --
-sample record values bytes: 700
+sample record values bytes: 1049
 RESULT: restore verified (counts equal, RLS enforced, constraints present). RTO for this dataset = backup+restore wall time above.

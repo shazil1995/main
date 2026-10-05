@@ -1,0 +1,66 @@
+{
+  "when": "2026-10-05T12:56:05.642Z",
+  "chromium": "141.0.7390.37",
+  "table": "100,000 records x 20 fields",
+  "steps": 60,
+  "stepsBackToTop": 54,
+  "samples": [
+    {
+      "label": "initial",
+      "heapMB": 3.7,
+      "domNodes": 750,
+      "renderedRows": 28,
+      "status": "100 loaded of 100,000+"
+    },
+    {
+      "label": "after 10 scroll-to-bottom steps",
+      "heapMB": 5.2,
+      "domNodes": 934,
+      "renderedRows": 36,
+      "status": "800 loaded of 100,000+"
+    },
+    {
+      "label": "after 20 scroll-to-bottom steps",
+      "heapMB": 5.2,
+      "domNodes": 934,
+      "renderedRows": 36,
+      "status": "800 loaded of 100,000+"
+    },
+    {
+      "label": "after 30 scroll-to-bottom steps",
+      "heapMB": 5.2,
+      "domNodes": 934,
+      "renderedRows": 36,
+      "status": "800 loaded of 100,000+"
+    },
+    {
+      "label": "after 40 scroll-to-bottom steps",
+      "heapMB": 5.3,
+      "domNodes": 934,
+      "renderedRows": 36,
+      "status": "800 loaded of 100,000+"
+    },
+    {
+      "label": "after 50 scroll-to-bottom steps",
+      "heapMB": 5.3,
+      "domNodes": 934,
+      "renderedRows": 36,
+      "status": "800 loaded of 100,000+"
+    },
+    {
+      "label": "after 60 scroll-to-bottom steps",
+      "heapMB": 5.4,
+      "domNodes": 934,
+      "renderedRows": 36,
+      "status": "800 loaded of 100,000+"
+    },
+    {
+      "label": "after scrolling back to top",
+      "heapMB": 5.6,
+      "domNodes": 750,
+      "renderedRows": 28,
+      "status": "800 loaded of 100,000+"
+    }
+  ],
+  "firstCellAfterReturn": "harbor harbor sign 0"
+}

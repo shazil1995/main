@@ -60,7 +60,8 @@ Evidence names refer to `server/test/*.test.ts` (API + Postgres integration), `w
 | Webhook endpoints (outgoing) | brief ("as implemented") | signed webhooks | 3 | planned | — | Not implemented |
 | Client examples (TS, Python) | brief | minimal working examples | 1 | implemented | `docs/examples/` run against the live API in this session | Not part of CI |
 | Tenant isolation | brief | app checks + Postgres RLS + composite FKs | 1 | verified | `security.test` isolation + RLS suites | App role is non-owner/no BYPASSRLS; owner role used for migrations/tests only |
-| Backup & restore | brief | tested restore into a clean DB | 1 | verified | `bench/raw/restore-test.txt` (see `docs/BACKUP_RESTORE.md`) | Logical backups only; no PITR; blob files backed up separately |
+| Backup & restore | brief | tested restore into a clean DB | 1 | verified | `bench/raw/restore-test.txt` (106k records: backup 2.0 s, restore 7.1 s) | Logical backups only; no PITR; blob files backed up separately; restore needs a superuser (see `docs/BACKUP_RESTORE.md`) |
+| Index-friendly queries behind RLS | brief (performance) | filters/search/sorts use indexes while RLS stays enforced | 1 | partial | `fastpaths.test`, `PERFORMANCE.md` (search 783→67 ms, indexed filter 492→71 ms, indexed sort 4037→71 ms p95) | Needs a one-time **superuser** provisioning step (`server/sql/leakproof.sql`); without it all features work but are slower. Un-indexed filters/sorts miss the 250 ms target; numeric range, ILIKE and multi-select filters never use indexes |
 
 ## Phase 2 — depth and collaboration (planned)
 

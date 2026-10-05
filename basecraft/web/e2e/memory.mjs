@@ -30,9 +30,15 @@ for (let i = 1; i <= steps; i++) {
   if (i % 10 === 0) { out.push(await sample(`after ${i} scroll-to-bottom steps`)); console.log(out.at(-1)); }
 }
 // scroll back to the top: dropped pages must be refetched via prev_cursor
-for (let i = 0; i < 40; i++) { await page.evaluate(() => { document.querySelector('.grid-scroll').scrollTop = 0; }); await page.waitForTimeout(250); }
+let backSteps = 0;
+for (; backSteps < 200; backSteps++) {
+  await page.evaluate(() => { document.querySelector('.grid-scroll').scrollTop = 0; }); await page.waitForTimeout(250);
+  const t = await page.getByRole('gridcell').first().innerText().catch(() => '');
+  if (/ sign 0\b/.test(t)) break;
+}
+console.log('steps to get back to the first record:', backSteps);
 out.push(await sample('after scrolling back to top')); console.log(out.at(-1));
 const first = await page.getByRole('gridcell').first().innerText().catch(() => '');
 mkdirSync(new URL('../../bench/raw/', import.meta.url), { recursive: true });
-writeFileSync(new URL('../../bench/raw/browser-memory.json', import.meta.url), JSON.stringify({ when: new Date().toISOString(), chromium: browser.version(), table: '100,000 records x 20 fields', steps, samples: out, firstCellAfterReturn: first }, null, 2));
+writeFileSync(new URL('../../bench/raw/browser-memory.json', import.meta.url), JSON.stringify({ when: new Date().toISOString(), chromium: browser.version(), table: '100,000 records x 20 fields', steps, stepsBackToTop: backSteps, samples: out, firstCellAfterReturn: first }, null, 2));
 await browser.close();

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Backs up the database, restores it into a CLEAN database, and verifies data, constraints and RLS. Output is retained in bench/raw/restore-test.txt.
-# Usage: DATABASE_URL=<owner dsn of source db> ADMIN_DSN=<superuser dsn> bash server/scripts/restore-test.sh
+# Usage: DATABASE_URL=<owner dsn of source db> ADMIN_DSN=<SUPERUSER dsn, db postgres> bash server/scripts/restore-test.sh
 set -euo pipefail
 SRC="${DATABASE_URL:?}"; ADMIN="${ADMIN_DSN:?}"; TARGET_DB="basecraft_restore_$$"
 OUT="$(dirname "$0")/../../bench/raw/restore-test.txt"; mkdir -p "$(dirname "$OUT")"
@@ -8,24 +8,17 @@ BACKUP="$(mktemp -d)/backup.dump"
 exec > >(tee "$OUT") 2>&1
 echo "== restore test $(date -u +%FT%TZ) =="
 t0=$(date +%s.%N)
-pg_dump --format=custom --no-owner --no-privileges --file="$BACKUP" "$SRC"
+pg_dump --format=custom --file="$BACKUP" "$SRC"   # keeps owners + ACLs, so no manual re-grant is needed
 t1=$(date +%s.%N)
 echo "backup: $(du -h "$BACKUP" | cut -f1) in $(printf '%.1f' "$(echo "$t1 - $t0" | bc)")s"
 psql "$ADMIN" -qc "CREATE DATABASE $TARGET_DB OWNER basecraft_owner"
 TARGET_ADMIN="${ADMIN%/*}/$TARGET_DB"
-psql "$TARGET_ADMIN" -qc "CREATE EXTENSION IF NOT EXISTS pg_trgm"
 t2=$(date +%s.%N)
-pg_restore --no-owner --role=basecraft_owner --dbname="$TARGET_ADMIN" "$BACKUP" 2>&1 | grep -v "already exists" || true
-# privileges are not part of the dump (--no-privileges); re-applying them is part of the documented restore procedure: re-run migrations' grants
-psql "$TARGET_ADMIN" -q <<'SQL'
-GRANT USAGE ON SCHEMA public TO basecraft_app;
-GRANT SELECT, INSERT, UPDATE, DELETE ON users, sessions, workspaces, members, invitations, api_tokens, bases, tables, fields, records, views, attachments, comments, resource_grants, automations, outbox_events, automation_runs, import_jobs, idempotency_keys TO basecraft_app;
-GRANT SELECT, INSERT ON audit_events TO basecraft_app;
-GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO basecraft_app;
-GRANT EXECUTE ON FUNCTION bc_claim_outbox, bc_claim_import_job, bc_cleanup, bc_orphan_attachments, bc_purge_attachment_row, bc_resolve TO basecraft_app;
-SQL
+# Restore as a SUPERUSER: the database contains superuser-provisioned objects (LEAKPROOF aliases + trigram operator class). Roles are cluster-level and must already exist.
+pg_restore --exit-on-error --dbname="$TARGET_ADMIN" "$BACKUP"
 t3=$(date +%s.%N)
 echo "restore: $(printf '%.1f' "$(echo "$t3 - $t2" | bc)")s"
+echo "fast paths restored (leakproof): $(psql "$TARGET_ADMIN" -Atc "select proleakproof from pg_proc where proname='bc_jtext'")"
 echo "-- row counts (source vs restored) --"
 for t in users workspaces members bases tables fields records views attachments automations audit_events outbox_events; do
   a=$(psql "$SRC" -Atc "select count(*) from $t"); b=$(psql "$TARGET_ADMIN" -Atc "select count(*) from $t")
