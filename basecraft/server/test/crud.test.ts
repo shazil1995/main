@@ -160,6 +160,18 @@ describe('query: filters, sorting, cursor pagination', () => {
       }
     }
   });
+  it('walks backwards with prev_cursor and sees exactly the same pages (bounded-window clients)', async () => {
+    for (const sort of [undefined, [{ field: t2.f.qty!, direction: 'asc' as const }], [{ field: t2.f.margin!, direction: 'desc' as const }, { field: t2.f.name!, direction: 'asc' as const }]]) {
+      const forward: any[][] = []; let cursor: string | undefined; let last: any;
+      for (;;) { const r = await q({ sort, limit: 9, cursor }); forward.push(r.body.records.map((x: any) => x.id)); last = r.body; if (!r.body.next_cursor) break; cursor = r.body.next_cursor; }
+      expect(forward.flat()).toHaveLength(60);
+      expect((await q({ sort, limit: 9 })).body.prev_cursor).toBeNull();
+      // now walk back from the last page
+      const back: any[][] = [forward[forward.length - 1]!]; let prev = last.prev_cursor;
+      while (prev) { const r = await q({ sort, limit: 9, cursor: prev }); back.unshift(r.body.records.map((x: any) => x.id)); expect(r.body.next_cursor).toBeTruthy(); prev = r.body.prev_cursor; }
+      expect(back.flat()).toEqual(forward.flat());
+    }
+  });
   it('multi-key sorts and filter+sort paginate stably', async () => {
     const body = { sort: [{ field: t2.f.status!, direction: 'asc' }, { field: t2.f.qty!, direction: 'desc' }], filter: { field: t2.f.tags!, op: 'has_any', value: ['led'] } };
     const all = await walk(body);

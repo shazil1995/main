@@ -168,7 +168,7 @@ export interface BuiltQuery {
   projection: Set<string> | undefined;
 }
 
-interface CursorPayload { v: (string | number | boolean | null)[]; s: number; h: string }
+interface CursorPayload { v: (string | number | boolean | null)[]; s: number; h: string; d?: 'f' | 'b' }
 
 function encodeCursor(secret: string, c: CursorPayload): string {
   const body = Buffer.from(JSON.stringify(c)).toString('base64url');
@@ -184,13 +184,16 @@ const CAST: Record<string, string> = { text: 'text', numeric: 'numeric', boolean
 
 export interface QueryResult {
   records: ApiRecord[];
+  /** Cursor for the page after this one (null at the end). */
   next_cursor: string | null;
+  /** Cursor for the page before this one (null at the start). Lets clients keep a bounded window of pages in memory. */
+  prev_cursor: string | null;
   total?: number;
   total_capped?: boolean;
 }
 
 /** Plain-object view of the SQL the planner should see; exported for EXPLAIN tooling and tests. */
-export function buildQuery(fields: FieldRow[], q: QueryInput, secretForHash: string, opts: { extraWhere?: string } = {}): { b: BuiltQuery; filterParams: Params; sortHash: string } {
+export function buildQuery(fields: FieldRow[], q: QueryInput, secretForHash: string, opts: { extraWhere?: string; reverse?: boolean } = {}): { b: BuiltQuery; filterParams: Params; sortHash: string } {
   const byId = new Map(fields.map((f) => [f.id, f]));
   const p = new Params();
   p.add(null); // $1 reserved for table_id
@@ -229,11 +232,13 @@ export function buildQuery(fields: FieldRow[], q: QueryInput, secretForHash: str
     } else sortCols.push({ sql: col.sql, dir: s.direction, kind: col.kind === 'timestamptz' ? 'timestamptz' : col.kind });
   }
   if (errors.length) throw unprocessable('Invalid query', errors);
-
   const sortHash = hmac(secretForHash, JSON.stringify((q.sort ?? []).map((s) => [s.field, s.direction])) + JSON.stringify(q.filter ?? null) + (q.search ?? '')).slice(0, 10);
+  // A backward page is the same keyset query with every direction flipped (ASC NULLS LAST <-> DESC NULLS FIRST is an exact
+  // mirror), whose rows are then reversed. The hash above is computed on the un-flipped spec so both directions share cursors.
+  if (opts.reverse) for (const sc of sortCols) sc.dir = sc.dir === 'asc' ? 'desc' : 'asc';
   // ASC => NULLS LAST, DESC => NULLS FIRST (Postgres defaults) so ONE btree index serves both directions; the seq tie-break
   // follows the first sort key's direction for the same reason.
-  const tieDir = sortCols[0]?.dir === 'desc' ? 'DESC' : 'ASC';
+  const tieDir = (sortCols[0] ? sortCols[0].dir === 'desc' : !!opts.reverse) ? 'DESC' : 'ASC';
   const orderBy = [...sortCols.map((s) => `${s.sql} ${s.dir === 'asc' ? 'ASC NULLS LAST' : 'DESC NULLS FIRST'}`), `r.seq ${tieDir}`].join(', ');
   const selectSort = sortCols.map((s, i) => `${s.sql} AS sk${i}`).join(', ');
 
@@ -278,10 +283,11 @@ export const TOTAL_CAP = 100_000;
 
 export async function runQuery(c: Client, tableId: string, fields: FieldRow[], q: QueryInput, secret: string, defaultLimit = LIMITS.defaultPageSize): Promise<QueryResult> {
   const limit = q.limit ?? defaultLimit;
-  const { b, filterParams, sortHash } = buildQuery(fields, q, secret);
+  const cur = q.cursor ? decodeCursor(secret, q.cursor) : null;
+  const backward = cur?.d === 'b';
+  const { b, filterParams, sortHash } = buildQuery(fields, q, secret, { reverse: backward });
   const params = filterParams;
   params.values[0] = tableId;
-  const cur = q.cursor ? decodeCursor(secret, q.cursor) : null;
   const filterWhere = b.where;
   const countParams = params.values.slice();
   const cursorSql = b.cursorCond(cur, params);
@@ -291,16 +297,26 @@ export async function runQuery(c: Client, tableId: string, fields: FieldRow[], q
   const res = await c.query(sql, params.values);
   const rows = res.rows as (RecordRow & Record<string, unknown>)[];
   const hasMore = rows.length > limit;
-  const page = hasMore ? rows.slice(0, limit) : rows;
+  let page = hasMore ? rows.slice(0, limit) : rows;
+  if (backward) page = page.reverse();
   const attachments = await loadAttachments(c, page.map((r) => r.id), fields);
-  const out: QueryResult = { records: page.map((r) => toApi(r, fields, attachments, b.projection)), next_cursor: null };
-  if (hasMore) {
-    const last = page[page.length - 1]!;
+  const out: QueryResult = { records: page.map((r) => toApi(r, fields, attachments, b.projection)), next_cursor: null, prev_cursor: null };
+  const cursorOf = (row: RecordRow & Record<string, unknown>, d: 'f' | 'b') => {
     const v = b.sortCols.map((_, i) => {
-      const x = last[`sk${i}`];
+      const x = row[`sk${i}`];
       return x instanceof Date ? x.toISOString() : ((x ?? null) as string | number | boolean | null);
     });
-    out.next_cursor = encodeCursor(secret, { v, s: last.seq, h: sortHash });
+    return encodeCursor(secret, { v, s: row.seq, h: sortHash, d });
+  };
+  if (page.length) {
+    const first = page[0]!, last = page[page.length - 1]!;
+    if (backward) {
+      out.next_cursor = cursorOf(last, 'f');                 // we arrived from later rows
+      out.prev_cursor = hasMore ? cursorOf(first, 'b') : null;
+    } else {
+      out.next_cursor = hasMore ? cursorOf(last, 'f') : null;
+      out.prev_cursor = cur ? cursorOf(first, 'b') : null;   // a forward page that started from a cursor has rows before it
+    }
   }
   if (q.include_total) {
     const t = await c.query(`SELECT count(*)::int AS n FROM (SELECT 1 FROM records r WHERE ${filterWhere} LIMIT ${TOTAL_CAP + 1}) x`, countParams);
