@@ -1,0 +1,21 @@
+{
+  "name": "basecraft",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Basecraft - an independently branded, self-hostable structured-data workspace (Airtable-style alternative)",
+  "type": "module",
+  "workspaces": ["shared", "server", "web"],
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "npm run build -w shared && npm run build -w server && npm run build -w web",
+    "typecheck": "npm run build -w shared && npm run typecheck -w server && npm run typecheck -w web",
+    "test": "npm run build -w shared && npm run test -w server && npm run test -w web",
+    "db:init": "bash server/scripts/db-init.sh",
+    "db:migrate": "npm run migrate -w server",
+    "db:seed": "npm run seed -w server",
+    "dev:api": "npm run dev -w server",
+    "dev:web": "npm run dev -w web",
+    "openapi": "npm run openapi -w server",
+    "bench": "npm run bench -w server"
+  }
+}
